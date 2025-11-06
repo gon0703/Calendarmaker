@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>맞춤형 달력 생성기</title>
+<style>
+  body {
+    font-family: "Pretendard", "Noto Sans KR", sans-serif;
+    background: linear-gradient(to bottom right, #f3f7fa, #eaf0ff);
+    margin: 20px;
+    color: #333;
+  }
+  h1 {
+    text-align: center;
+    color: #2c3e50;
+    text-shadow: 1px 1px 2px #fff;
+  }
+  .controls {
+    text-align: center;
+    margin-top: 20px;
+    margin-bottom: 15px;
+  }
+  input[type="date"] {
+    padding: 8px;
+    font-size: 1em;
+    margin: 5px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+  }
+  button, label.upload {
+    padding: 10px 18px;
+    margin: 5px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    color: white;
+    font-size: 0.95em;
+    transition: background-color 0.2s;
+  }
+  button#generate { background-color: #17a2b8; }
+  button#save { background-color: #007bff; }
+  button#print { background-color: #6c63ff; }
+  label.upload { background-color: #28a745; display: inline-block; }
+  button#generate:hover { background-color: #117a8b; }
+  button#save:hover { background-color: #0056b3; }
+  button#print:hover { background-color: #5148d1; }
+  label.upload:hover { background-color: #218838; }
+  input[type="file"] { display: none; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    margin-top: 20px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  th, td {
+    border: 1px solid #ccc;
+    text-align: left;
+    vertical-align: top;
+    padding: 8px;
+  }
+  th {
+    background-color: #007bff;
+    color: white;
+    font-weight: 600;
+  }
+  th:nth-child(6) { background-color: #70a1ff; }
+  th:nth-child(7) { background-color: #ff6b6b; }
+  td {
+    height: 120px;
+    transition: background-color 0.3s;
+  }
+  td:hover { background-color: #f1f7ff; }
+  .date {
+    font-weight: bold;
+    margin-bottom: 5px;
+    font-size: 0.95em;
+    color: #2c3e50;
+  }
+  textarea {
+    width: 100%;
+    height: 80px;
+    border: none;
+    resize: none;
+    background-color: #fff8d5;
+    font-family: inherit;
+    font-size: 0.9em;
+    padding: 6px;
+    border-radius: 6px;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+  }
+  textarea:focus {
+    outline: none;
+    background-color: #fff1b8;
+  }
+  /* 주말 강조 */
+  td:nth-child(6) { background-color: #f0f7ff; }
+  td:nth-child(7) { background-color: #ffecec; }
+  /* 주마다 색감 변화 */
+  tbody tr:nth-child(odd) td { background-color: #fafcff; }
+
+  @media print {
+    body { background: white; }
+    .controls { display: none; }
+    textarea { border: 1px solid #ccc; background: #fff; }
+    th { background-color: #ddd !important; color: black !important; }
+  }
+</style>
+</head>
+<body>
+
+<h1>📆 맞춤형 달력 생성기</h1>
+
+<div class="controls">
+  <label>시작일:</label>
+  <input type="date" id="start-date">
+  <label>종료일:</label>
+  <input type="date" id="end-date">
+  <button id="generate">📅 달력 만들기</button>
+</div>
+
+<div class="controls" id="action-buttons" style="display:none;">
+  <button id="save">💾 메모 저장하기</button>
+  <label for="load-file" class="upload">📂 메모 불러오기</label>
+  <input type="file" id="load-file" accept=".txt">
+  <button id="print" onclick="window.print()">🖨️ 인쇄하기</button>
+</div>
+
+<div id="calendar-container"></div>
+
+<script>
+  const calendarContainer = document.getElementById("calendar-container");
+
+  function generateCalendar(start, end) {
+    calendarContainer.innerHTML = "";
+    const table = document.createElement("table");
+    const thead = document.createElement("thead");
+    const tbody = document.createElement("tbody");
+    const headerRow = document.createElement("tr");
+    const days = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"];
+
+    days.forEach(day => {
+      const th = document.createElement("th");
+      th.textContent = day;
+      headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    let currentRow = document.createElement("tr");
+    let currentDate = new Date(start);
+
+    // 첫 주 공백 채우기
+    for (let i = 0; i < (currentDate.getDay() || 7) - 1; i++) {
+      currentRow.appendChild(document.createElement("td"));
+    }
+
+    while (currentDate <= end) {
+      const cell = document.createElement("td");
+      const dateDiv = document.createElement("div");
+      dateDiv.className = "date";
+      const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth()+1).padStart(2,'0')}-${String(currentDate.getDate()).padStart(2,'0')}`;
+      dateDiv.textContent = `${currentDate.getMonth()+1}/${currentDate.getDate()}`;
+
+      const memo = document.createElement("textarea");
+      memo.placeholder = "메모를 입력하세요...";
+      memo.dataset.date = dateStr;
+
+      cell.appendChild(dateDiv);
+      cell.appendChild(memo);
+      currentRow.appendChild(cell);
+
+      if (currentDate.getDay() === 0) { // 일요일(0)
+        tbody.appendChild(currentRow);
+        currentRow = document.createElement("tr");
+      }
+
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    if (currentRow.children.length > 0) tbody.appendChild(currentRow);
+    table.appendChild(tbody);
+    calendarContainer.appendChild(table);
+    document.getElementById("action-buttons").style.display = "block";
+  }
+
+  // 📅 달력 생성 버튼
+  document.getElementById("generate").addEventListener("click", () => {
+    const startInput = document.getElementById("start-date").value;
+    const endInput = document.getElementById("end-date").value;
+    if (!startInput || !endInput) {
+      alert("시작일과 종료일을 모두 선택하세요!");
+      return;
+    }
+    const start = new Date(startInput);
+    const end = new Date(endInput);
+    if (start > end) {
+      alert("종료일은 시작일보다 뒤여야 합니다!");
+      return;
+    }
+    generateCalendar(start, end);
+  });
+
+  // 💾 메모 저장
+  document.getElementById("save").addEventListener("click", () => {
+    const memos = {};
+    document.querySelectorAll("textarea").forEach(t => {
+      if (t.value.trim()) memos[t.dataset.date] = t.value.trim();
+    });
+    const blob = new Blob([JSON.stringify(memos, null, 2)], {type: "text/plain;charset=utf-8"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "달력메모.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  // 📂 메모 불러오기
+  document.getElementById("load-file").addEventListener("change", (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const memos = JSON.parse(e.target.result);
+      document.querySelectorAll("textarea").forEach(t => {
+        if (memos[t.dataset.date]) t.value = memos[t.dataset.date];
+      });
+      alert("메모가 불러와졌습니다!");
+    };
+    reader.readAsText(file);
+  });
+</script>
+
+</body>
+</html>
